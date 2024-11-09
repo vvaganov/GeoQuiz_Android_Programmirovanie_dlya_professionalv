@@ -1,5 +1,6 @@
 package com.example.geoquiz
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
@@ -7,9 +8,13 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 
+const val TAG = "MainActivity!"
+private const val INDEX_KEY = "currentIndex"
+private const val CORRECT_ANSWER_KEY = "correctAnswerKey"
+private const val INCORRECT_ANSWER_KEY = "incorrectAnswerKey"
 
-private const val TAG = "MainActivity!"
 
 
 class MainActivity : AppCompatActivity() {
@@ -18,36 +23,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var falseButton: Button
     private lateinit var questionText: TextView
     private lateinit var nextButton: Button
+    private lateinit var cheatButton: Button
 
-    private val questionBank = listOf(
-        Question(R.string.question_australia, true),
-        Question(R.string.question_oceans, true),
-        Question(R.string.question_mideast, false),
-        Question(R.string.question_africa, false),
-        Question(R.string.question_americas, true),
-        Question(R.string.question_asia, true)
-    )
-    private var currentIndex = 0
-    private var correctAnswerCount = 0
-    private var incorrectAnswerCount = 0
+    private val quizViewModel by lazy { ViewModelProvider(this)[QuizViewModel::class.java] }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "onCreate(Bandle?) called ")
+        Log.d(TAG, "onCreate() called ")
         setContentView(R.layout.activity_main)
+
+        val currentIndex = savedInstanceState?.getInt(INDEX_KEY) ?: 0
+        quizViewModel.currentIndex = currentIndex
+        val correctAnswerCount = savedInstanceState?.getInt(CORRECT_ANSWER_KEY) ?: 0
+        quizViewModel.correctAnswerCount = correctAnswerCount
+        val incorrectAnswerCount = savedInstanceState?.getInt(INCORRECT_ANSWER_KEY) ?: 0
+        quizViewModel.incorrectAnswerCount = incorrectAnswerCount
+        Log.d(TAG, "Got a QuizViewModel: $quizViewModel")
 
         trueButton = findViewById(R.id.true_button)
         falseButton = findViewById(R.id.false_button)
         questionText = findViewById(R.id.question_text_view)
         nextButton = findViewById(R.id.next_button)
+        cheatButton = findViewById(R.id.cheat_button)
 
         updateQuestion()
 
         questionText.setOnClickListener {
-            currentIndex = (currentIndex + 1) % questionBank.size
+            quizViewModel.currentIndex = quizViewModel.getQuestion
             updateQuestion()
         }
-
 
         trueButton.setOnClickListener {
             checkAnswer(true)
@@ -61,14 +65,22 @@ class MainActivity : AppCompatActivity() {
             trueButton.isEnabled = false
         }
 
+        cheatButton.setOnClickListener {
+            val answerIsTrue = quizViewModel.getCurrentAnswer
+            val intent = CheatActivity.newIntent(this@MainActivity, answerIsTrue)
+
+            startActivity(intent)
+        }
+
         nextButton.setOnClickListener {
-            if (correctAnswerCount + incorrectAnswerCount == questionBank.size) {
+            if (quizViewModel.correctAnswerCount + quizViewModel.incorrectAnswerCount == quizViewModel.questionBankSize) {
+
                 questionText.text =
-                    "Вы ответили на все вопросы. $correctAnswerCount правильных ответа и $incorrectAnswerCount не правильных"
-                incorrectAnswerCount = 0
-                correctAnswerCount = 0
+                    "Вы ответили на все вопросы. ${quizViewModel.correctAnswerCount} правильных ответа и ${quizViewModel.incorrectAnswerCount} не правильных"
+                quizViewModel.incorrectAnswerCount = 0
+                quizViewModel.correctAnswerCount = 0
             } else {
-                currentIndex = (currentIndex + 1) % questionBank.size
+                quizViewModel.currentIndex = quizViewModel.moveToNext()
                 updateQuestion()
                 falseButton.isEnabled = true
                 trueButton.isEnabled = true
@@ -78,42 +90,50 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        Log.d(TAG, "onStart(Bandle?) called ")
+        Log.d(TAG, "onStart() called ")
     }
 
     override fun onResume() {
         super.onResume()
-        Log.d(TAG, "onResume(Bandle?) called ")
+        Log.d(TAG, "onResume() called ")
     }
 
     override fun onPause() {
         super.onPause()
-        Log.d(TAG, "onPause(Bandle?) called ")
+
+        Log.d(TAG, "onPause() called ")
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(INDEX_KEY, quizViewModel.currentIndex)
+        outState.putInt(CORRECT_ANSWER_KEY, quizViewModel.correctAnswerCount)
+        outState.putInt(INCORRECT_ANSWER_KEY, quizViewModel.incorrectAnswerCount)
     }
 
     override fun onStop() {
         super.onStop()
-        Log.d(TAG, "onStop(Bandle?) called ")
+        Log.d(TAG, "onStop() called ")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "onDestroy(Bandle?) called ")
+        Log.d(TAG, "onDestroy() called ")
     }
 
     private fun updateQuestion() {
-        questionText.setText(questionBank[currentIndex].textResId)
+        questionText.setText(quizViewModel.getQuestion)
     }
 
     private fun checkAnswer(userAnswer: Boolean) {
-        val correctAnswer = questionBank[currentIndex].answer
+        val correctAnswer = quizViewModel.getCurrentAnswer
 
         var messageResId = 0
         if (userAnswer == correctAnswer) {
-            correctAnswerCount++
+            quizViewModel.correctAnswerCount++
             messageResId = R.string.correct_toast
         } else {
-            incorrectAnswerCount++
+            quizViewModel.incorrectAnswerCount++
             messageResId = R.string.incorrect_toast
 
         }
