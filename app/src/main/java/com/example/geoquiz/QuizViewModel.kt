@@ -17,6 +17,7 @@ class QuizViewModel : ViewModel() {
     var correctAnswerCount = 0
     var incorrectAnswerCount = 0
     val questionBankSize = questionBank.size
+    var isCheater = false
 
     val getCurrentAnswer: Boolean get() = questionBank[currentIndex].answer
     val getQuestion: Int get() = questionBank[currentIndex].textResId
